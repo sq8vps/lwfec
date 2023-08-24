@@ -49,6 +49,6 @@ Size limits used for array preallocation are stored in *rs.h*:
 #define RS_MAX_REDUNDANCY_BYTES 32 //maximum parity bytes
 ```
 ## License
-The code is based on *Reed-Solomon codes for coders* from https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders.
+The code is based on [*Reed-Solomon codes for coders*](https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders).
 The project is licensed under the GNU GPL v3 license (see [LICENSE](LICENSE)).
 
