@@ -45,8 +45,8 @@ The library does not provide any kind of data segmentation, padding etc. The cod
 ## Size limit change
 Size limits used for array preallocation are stored in *rs.h*:
 ```C
-#define RS_MAX_BLOCK_SIZE 256 //maximum block (data + parity bytes) size
-#define RS_MAX_REDUNDANCY_BYTES 32 //maximum parity bytes
+#define RS_MAX_BLOCK_SIZE 255 //maximum block (data + parity bytes) size
+#define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
 ```
 ## License
 The code is based on [*Reed-Solomon codes for coders*](https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders).
