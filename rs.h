@@ -18,8 +18,8 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
-#define RS_MAX_BLOCK_SIZE 256 //maximum block (data + parity bytes) size
-#define RS_MAX_REDUNDANCY_BYTES 32 //maximum parity bytes
+#define RS_MAX_BLOCK_SIZE 255 //maximum block (data + parity bytes) size
+#define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
 
 #define RS_MAX_DATA_SIZE (RS_MAX_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
 
