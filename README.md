@@ -6,7 +6,7 @@ LwFEC is a full Reed-Solomon FEC encoder and decoder C library dedicated for emb
 * No stack-allocated arrays are used
 
 Block size limit and parity byte count limit can be changed freely according to application requirements. This allows the memory usage to stay at the required minimum.
-There is an architectural limit of 256 block size limit due to use of GF(2^8).
+There is an architectural limit of 255 block size limit due to use of GF(2^8).
 
 ## Example usage
 The example below shows how to create generator polynomial, encode and decode a message:
