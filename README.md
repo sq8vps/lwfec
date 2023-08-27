@@ -5,32 +5,36 @@ LwFEC is a full Reed-Solomon FEC encoder and decoder C library dedicated for emb
 * No heap (malloc) is used
 * No stack-allocated arrays are used
 
-Block size limit and parity byte count limit can be changed freely according to application requirements. This allows the memory usage to stay at the required minimum.
-There is an architectural limit of 256 block size limit due to use of GF(2^8).
+Parity byte count limit can be changed freely according to application requirements. This allows the memory usage to stay at the required minimum.
 
 ## Example usage
-The example below shows how to create generator polynomial, encode and decode a message:
+The example below shows how to initialize library, encode and decode a message:
 ```C
 #include <stdint.h> //standard integer types header
 #include "rs.h" //RS FEC library
 
-#define N 16 //block (data + parity) size
+#define K 12 //data size
 #define T 5 //parity size
+#define FCR 0 //first consecutive root index
 
-uint8_t generator[T + 1]; //generator polynomial buffer
+struct LwFecRS rs; //RS encoder/decoder instance
 
 void LwFEC(void)
 {
-    RsGeneratePolynomial(T, generator); //create generator polynomial
-    uint8_t data[N] = {'H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', 0, 0, 0, 0, 0, 0};
-    RsEncode(data, N, generator, T); //encode message
+    RsInit(&rs, T, FCR);
+    uint8_t data[RS_BLOCK_SIZE] = {'H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', '\0'};
+    RsEncode(&rs, data, N); //encode message
 
-    //then N bytes of data are sent through some channel
+    //then N=RS_BLOCK_SIZE bytes of data are sent through some channel
     //or stored on some disk
     //this may introduce errors that the decoder will try to fix
+    
+    //alter some bytes for demonstration
+    data[1] = 'h';
+    data[5] = 'x';
 
     uint8_t bytesFixed = 0; //store number of corrected bytes here
-    if(RsDecode(data, N, generator, T, &bytesFixed)) //decode message
+    if(RsDecode(&rs, data, K, &bytesFixed)) //decode message
     {
         //message decoded succesfully
     }
@@ -41,12 +45,11 @@ void LwFEC(void)
 }
 ```
 ## Important notes
-The library does not provide any kind of data segmentation, padding etc. The coder/decoder does not store any configuration information, thus it can be used dynamically with any block size *N* and data size *K* (or parity size *T=N-K*), as long as the appropriate generator polynomial is provided.
+The block size is always equal to RS_BLOCK_SIZE (255 bytes) due to use of GF(2^8), however the library can handle any data size *K* provided *T + K <= RS_BLOCK_SIZE*. The remaining block space is padded automatically with zeros. The application just needs to provide *K* bytes of data.
 ## Size limit change
 Size limits used for array preallocation are stored in *rs.h*:
 ```C
-#define RS_MAX_BLOCK_SIZE 256 //maximum block (data + parity bytes) size
-#define RS_MAX_REDUNDANCY_BYTES 32 //maximum parity bytes
+#define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
 ```
 ## License
 The code is based on [*Reed-Solomon codes for coders*](https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders).

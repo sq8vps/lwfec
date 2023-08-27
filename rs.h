@@ -18,35 +18,50 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
-#define RS_MAX_BLOCK_SIZE 256 //maximum block (data + parity bytes) size
-#define RS_MAX_REDUNDANCY_BYTES 32 //maximum parity bytes
+#define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
 
-#define RS_MAX_DATA_SIZE (RS_MAX_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
+
+#define RS_BLOCK_SIZE 255 //natural full RS block size
+#define RS_MAX_DATA_SIZE (RS_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
 
 /**
- * @brief Decode message using Reed-Solomon FEC (in-place)
- * @param *data Input/output buffer of N=K+T bytes, where K = data size and T = number of redundancy bytes
- * @param size Block size = N
- * @param *generator Generator polynomial (buffer size = T + 1)
- * @param redundancyBytes Number of redundancy bytes = T
- * @param *fixed Output number of fixed bytes
+ * @brief Reed-Solomon module configuration structure
+*/
+struct LwFecRS
+{
+    uint8_t generator[RS_MAX_REDUNDANCY_BYTES + 1]; //generator polynomial
+    uint8_t T; //number of redundancy/parity bytes
+    uint8_t fcr; //first consecutive root index
+};
+
+/**
+ * @brief Decode message using Reed-Solomon FEC
+ * 
+ * This function takes input buffer with K data bytes and T parity bytes
+ * Then it moves parity bytes to the end and fills everything inbetween with zeros.
+ * Next the in-place decoding is performed.
+ * @param *rs RS coder/decoder instance
+ * @param *data Input/output buffer. Must be of size N = 255
+ * @param size Data size = K
+ * @param *fixed Output number of bytes corrected
  * @return True on success, false on failure
  */
-bool RsDecode(uint8_t *data, uint8_t size, uint8_t *generator, uint8_t redundancyBytes, uint8_t *fixed);
+bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);
 
 /**
  * @brief Encode message using Reed-Solomon FEC
- * @param *data Input/output buffer of N=K+T bytes, where K = data size and T = number of redundancy bytes
- * @param size Block size = N
- * @param *generator Generator polynomial (buffer size = T + 1)
- * @param redundancyBytes Number of redundancy bytes = T
+ * @param *rs RS coder/decoder instance
+ * @param *data Input/output buffer. Must be of size N = 255
+ * @param size Data size = K
  */
-void RsEncode(uint8_t *data, uint8_t size, uint8_t *generator, uint8_t redundancyBytes);
+void RsEncode(struct LwFecRS *rs, uint8_t *data, uint8_t size);
 
 /**
- * @brief Create generator polynomial for Reed-Solomon FEC
- * @param t Number of redundancy bytes = T = N - K (block size - data size)
- * @param *out Output polynomial (buffer size = T + 1), must be preallocated by caller
- * @attention Polynomial length is always 1 byte bigger than T
+ * @brief Initialize Reed-Solomon coder/decoder
+ * 
+ * This function calculates generator polynomial and stores required constants.
+ * @param *rs RS coder/decoder instance to be filled
+ * @param T Number of parity check bytes
+ * @param fcr First consecutive root index
 */
-void RsGeneratePolynomial(uint8_t t, uint8_t *out);
+void RsInit(struct LwFecRS *rs, uint8_t T, uint8_t fcr);
