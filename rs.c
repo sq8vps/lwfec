@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Piotr Wilkoń
+Copyright 2023-2025 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
