@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Piotr Wilkoń
+Copyright 2023-2025 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -26,13 +26,56 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #define RS_MAX_DATA_SIZE (RS_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
 
 /**
- * @brief Reed-Solomon module configuration structure
+ * @brief Reed-Solomon module configuration and operation structure
 */
 struct LwFecRS
 {
     uint8_t generator[RS_MAX_REDUNDANCY_BYTES + 1]; //generator polynomial
     uint8_t T; //number of redundancy/parity bytes
     uint8_t fcr; //first consecutive root index
+
+
+    union
+    {
+        uint8_t initBuffer[RS_MAX_REDUNDANCY_BYTES + 1];
+        uint8_t encodeBuffer[RS_BLOCK_SIZE];
+    };
+
+    struct
+    {
+        uint8_t syndromes[RS_MAX_REDUNDANCY_BYTES + 1];
+        uint8_t locator[RS_MAX_REDUNDANCY_BYTES + 1];
+        uint8_t evaluator[RS_MAX_REDUNDANCY_BYTES + 1];
+    } decodeBuffer;
+
+    union
+    {
+        union
+        {
+            struct
+            {
+                uint8_t errLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t newLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t oldLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t tmpLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+            };
+            struct
+            {
+                uint8_t B[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t C[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t T[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t T2[RS_MAX_REDUNDANCY_BYTES + 1];
+            };
+        } locatorBuffer;
+        struct
+        {
+            uint8_t locator[RS_MAX_REDUNDANCY_BYTES + 1];
+            uint8_t errataEvaluator[2 * RS_MAX_REDUNDANCY_BYTES + 2];
+            uint8_t errataPosition[RS_MAX_REDUNDANCY_BYTES];
+        } fixerBuffer;
+        
+    };
+    
 };
 
 /**
@@ -44,7 +87,7 @@ struct LwFecRS
  * @param *rs RS coder/decoder instance
  * @param *data Input/output buffer. Must be of size N = 255
  * @param size Data size = K
- * @param *fixed Output number of bytes corrected
+ * @param *fixed Output number of bytes corrected (NULL if not needed)
  * @return True on success, false on failure
  */
 bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);

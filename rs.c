@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Piotr Wilkoń
+Copyright 2023-2025 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -20,20 +20,8 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include "gf.h"
 #include <string.h>
 
-#define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
-//#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
-
-
-/*
-This implementation aims for:
-1. Minimal RAM usage
-2. No malloc() (no heap usage)
-3. No big stack allocated arrays
-All arrays used internally by functions are either declared as static
-or they use the common buffer declared below. This buffer must be used with caution.
-All functions that use this buffer can only use it to store function-scope data.
-*/
-static uint8_t commonBuffer[4 * RS_MAX_REDUNDANCY_BYTES + 4];
+//#define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
+#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
 
 /**
  * @brief Calculates message syndromes
@@ -121,30 +109,20 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
     uint8_t m = 1; //number of iterations since L, B and b were updated
     uint8_t b = 1; //last discrepancy delta
 
-    //4 variables of RS_MAX_REDUNDANCY_BYTES + 1 each
-    // static uint8_t B[RS_MAX_REDUNDANCY_BYTES + 1]; //last locator polynomial
-    // static uint8_t C[RS_MAX_REDUNDANCY_BYTES + 1]; //current locator polynomial
-    // static uint8_t T[RS_MAX_REDUNDANCY_BYTES + 1]; //temporary polynomial
-    // static uint8_t T2[RS_MAX_REDUNDANCY_BYTES + 1]; //temporary polynomial
-    uint8_t *B = commonBuffer;
-    uint8_t *C = B + RS_MAX_REDUNDANCY_BYTES + 1;
-    uint8_t *T = C + RS_MAX_REDUNDANCY_BYTES + 1;
-    uint8_t *T2 = T + RS_MAX_REDUNDANCY_BYTES + 1;
-
     //initialize B and C polynomials with the constant term
-    memset(B, 0, rs->T + 1);
-    B[0] = 1;
-    memset(C, 0, rs->T + 1);
-    C[0] = 1;
-    memset(T, 0, rs->T + 1);
-    memset(T2, 0, rs->T + 1);
+    memset(rs->locatorBuffer.B, 0, rs->T + 1);
+    rs->locatorBuffer.B[0] = 1;
+    memset(rs->locatorBuffer.C, 0, rs->T + 1);
+    rs->locatorBuffer.C[0] = 1;
+    memset(rs->locatorBuffer.T, 0, rs->T + 1);
+    memset(rs->locatorBuffer.T2, 0, rs->T + 1);
 
     for(uint8_t i = 0; i < rs->T; i++)
     {
         uint8_t d = syndromes[i];
         for(uint8_t j = 1; j <= L; j++)
         {
-            d = GfAdd(d, GfMul(C[j], syndromes[i - j])); //calculate discrepancy delta
+            d = GfAdd(d, GfMul(rs->locatorBuffer.C[j], syndromes[i - j])); //calculate discrepancy delta
         }
         if(d == 0) //no error
         {
@@ -152,7 +130,7 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         }
         else if((L << 1) <= i)
         {
-            memcpy(T, C, rs->T); //store C polynomial in T
+            memcpy(rs->locatorBuffer.T, rs->locatorBuffer.C, rs->T); //store C polynomial in T
             //in general, C(x)=C(x)-(d/b)*B(x)*x^m
             //first B(x)=B(x)*x^m
             //here we store polynomials as the lowest degree term first
@@ -160,19 +138,19 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
             //so swap places starting from the last element and fill first m places with zeros
             for(uint8_t j = 0; j < (rs->T - m); j++)
             {
-                B[rs->T - j - 1] = B[rs->T - j - m - 1];
+                rs->locatorBuffer.B[rs->T - j - 1] = rs->locatorBuffer.B[rs->T - j - m - 1];
             }
             for(uint8_t j = 0; j < m; j++)
-                B[j] = 0;
+                rs->locatorBuffer.B[j] = 0;
 
             //then B(x)*d/b
-            GfPolyScale(B, rs->T, GfMul(d, GfInv(b)), B);
+            GfPolyScale(rs->locatorBuffer.B, rs->T, GfMul(d, GfInv(b)), rs->locatorBuffer.B);
 
             //then C(x)=C(x)-B(x) (subtraction is the same as addition in GF)
-            GfPolyAdd(T, rs->T, B, rs->T, C);
+            GfPolyAdd(rs->locatorBuffer.T, rs->T, rs->locatorBuffer.B, rs->T, rs->locatorBuffer.C);
 
             //store T polynomial in B (previous C to B)
-            memcpy(B, T, rs->T);
+            memcpy(rs->locatorBuffer.B, rs->locatorBuffer.T, rs->T);
 
             L = i + 1 - L;
             b = d;
@@ -181,65 +159,55 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         else
         {
             //the same as above, but save B in T2 first
-            memcpy(T, C, rs->T);
-            memcpy(T2, B, rs->T);
+            memcpy(rs->locatorBuffer.T, rs->locatorBuffer.C, rs->T);
+            memcpy(rs->locatorBuffer.T2, rs->locatorBuffer.B, rs->T);
             for(uint8_t j = 0; j < (rs->T - m); j++)
             {
-                B[rs->T - j - 1] = B[rs->T - j - m - 1];
+                rs->locatorBuffer.B[rs->T - j - 1] = rs->locatorBuffer.B[rs->T - j - m - 1];
             }
             for(uint8_t j = 0; j < m; j++)
-                B[j] = 0;
-            GfPolyScale(B, rs->T, GfMul(d, GfInv(b)), B);
-            GfPolyAdd(T, rs->T, B, rs->T, C);
+                rs->locatorBuffer.B[j] = 0;
+            GfPolyScale(rs->locatorBuffer.B, rs->T, GfMul(d, GfInv(b)), rs->locatorBuffer.B);
+            GfPolyAdd(rs->locatorBuffer.T, rs->T, rs->locatorBuffer.B, rs->T, rs->locatorBuffer.C);
             //restore T2 to B
-            memcpy(B, T2, rs->T);
+            memcpy(rs->locatorBuffer.B, rs->locatorBuffer.T2, rs->T);
             m++;
         }
     }
 
     *outSize = L + 1;
-    memcpy(out, C, rs->T);
+    memcpy(out, rs->locatorBuffer.C, rs->T);
 
     if((L * 2) > rs->T)
         return false;
 
     return true;
 #else
-
-    // static uint8_t errLoc[RS_MAX_REDUNDANCY_BYTES + 1];
-    // static uint8_t newLoc[RS_MAX_REDUNDANCY_BYTES + 1];
-    // static uint8_t oldLoc[RS_MAX_REDUNDANCY_BYTES + 1];
-    // static uint8_t tmpLoc[RS_MAX_REDUNDANCY_BYTES + 1];
-    uint8_t *errLoc = commonBuffer;
-    uint8_t *newLoc = errLoc + RS_MAX_REDUNDANCY_BYTES + 1;
-    uint8_t *oldLoc = newLoc + RS_MAX_REDUNDANCY_BYTES + 1;
-    uint8_t *tmpLoc = oldLoc + RS_MAX_REDUNDANCY_BYTES + 1;
-
-    memset(errLoc, 0, rs->T + 1);
-    memset(newLoc, 0, rs->T + 1);
-    memset(oldLoc, 0, rs->T + 1);
-    memset(tmpLoc, 0, rs->T + 1);
+    memset(rs->locatorBuffer.errLoc, 0, rs->T + 1);
+    memset(rs->locatorBuffer.newLoc, 0, rs->T + 1);
+    memset(rs->locatorBuffer.oldLoc, 0, rs->T + 1);
+    memset(rs->locatorBuffer.tmpLoc, 0, rs->T + 1);
 
     uint8_t newLocLen = 0;
     uint8_t errLocLen = 1;
     uint8_t oldLocLen = 1;
 
-    errLoc[0] = 1;
-    oldLoc[0] = 1;
+    rs->locatorBuffer.errLoc[0] = 1;
+    rs->locatorBuffer.oldLoc[0] = 1;
 
     for(uint8_t i = 0; i < rs->T; i++)
     {
         uint8_t delta = syndromes[i];
         for(uint8_t j = 1; j < errLocLen; j++)
         {
-            delta = GfSub(delta, GfMul(errLoc[j], syndromes[i - j]));
+            delta = GfSub(delta, GfMul(rs->locatorBuffer.errLoc[j], syndromes[i - j]));
         }
 
         for(uint8_t j = 0; j < oldLocLen; j++)
         {
-            oldLoc[oldLocLen - j] = oldLoc[oldLocLen - j - 1];
+            rs->locatorBuffer.oldLoc[oldLocLen - j] = rs->locatorBuffer.oldLoc[oldLocLen - j - 1];
         }
-        oldLoc[0] = 0;
+        rs->locatorBuffer.oldLoc[0] = 0;
 
         oldLocLen++;
 
@@ -247,27 +215,27 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         {
             if(oldLocLen > errLocLen)
             {
-                GfPolyScale(oldLoc, oldLocLen, delta, newLoc);
+                GfPolyScale(rs->locatorBuffer.oldLoc, oldLocLen, delta, rs->locatorBuffer.newLoc);
                 newLocLen = oldLocLen;
-                GfPolyScale(errLoc, errLocLen, GfInv(delta), oldLoc);
+                GfPolyScale(rs->locatorBuffer.errLoc, errLocLen, GfInv(delta), rs->locatorBuffer.oldLoc);
                 oldLocLen = errLocLen;
-                memcpy(errLoc, newLoc, newLocLen);
+                memcpy(rs->locatorBuffer.errLoc, rs->locatorBuffer.newLoc, newLocLen);
                 errLocLen = newLocLen;
             }
-            GfPolyScale(oldLoc, oldLocLen, delta, newLoc);
+            GfPolyScale(rs->locatorBuffer.oldLoc, oldLocLen, delta, rs->locatorBuffer.newLoc);
             newLocLen = oldLocLen;
-            memcpy(tmpLoc, errLoc, errLocLen);
-            errLocLen = GfPolyAdd(tmpLoc, errLocLen, newLoc, newLocLen, errLoc);
+            memcpy(rs->locatorBuffer.tmpLoc, rs->locatorBuffer.errLoc, errLocLen);
+            errLocLen = GfPolyAdd(rs->locatorBuffer.tmpLoc, errLocLen, rs->locatorBuffer.newLoc, newLocLen, rs->locatorBuffer.errLoc);
         }
     }
 
     uint8_t index = 0;
     for(uint8_t i = 0; i < errLocLen; i++)
     {
-        if((index == 0) && (errLoc[i] == 0)) //drop leading zeros
+        if((index == 0) && (rs->locatorBuffer.errLoc[i] == 0)) //drop leading zeros
             continue;
 
-        out[index++] = errLoc[i];
+        out[index++] = rs->locatorBuffer.errLoc[i];
     }
 
     if(((errLocLen - 1) << 1) > rs->T)
@@ -293,39 +261,33 @@ static bool fix(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *syn, u
     /*
      * This is based on Forney's algorithm.
      */
-    //variables of size 3 * RS_MAX_REDUNDANCY_BYTES + 3
-    //static uint8_t locator[RS_MAX_REDUNDANCY_BYTES + 1];
-    //static uint8_t errataEvaluator[2 * RS_MAX_REDUNDANCY_BYTES + 2];
-    uint8_t *locator = commonBuffer;
-    uint8_t *errataEvaluator = locator + RS_MAX_REDUNDANCY_BYTES + 1;
 
-    memset(locator, 0, rs->T + 1);
-    memset(errataEvaluator, 0, 2 * rs->T + 2);
+    memset(rs->fixerBuffer.locator, 0, rs->T + 1);
+    memset(rs->fixerBuffer.errataEvaluator, 0, 2 * rs->T + 2);
     
-    locator[0] = 1; //initialize error locator to constant
+    rs->fixerBuffer.locator[0] = 1; //initialize error locator to constant
     uint8_t locatorSize = 1;
 
     //use "errataEvaluator" as temporary variable
     for(uint8_t i = 0; i < errCount; i++)
     {
-        memcpy(errataEvaluator, locator, rs->T);
-        GfPolyMul(errataEvaluator, locatorSize, (uint8_t[2]){GfPow(2, size - 1 - evaluator[i]), 1}, 2, locator);
+        memcpy(rs->fixerBuffer.errataEvaluator, rs->fixerBuffer.locator, rs->T);
+        GfPolyMul(rs->fixerBuffer.errataEvaluator, locatorSize, (uint8_t[2]){GfPow(2, size - 1 - evaluator[i]), 1}, 2, rs->fixerBuffer.locator);
         locatorSize++;
     }
 
-    memset(errataEvaluator, 0, 2 * rs->T + 2);
+    memset(rs->fixerBuffer.errataEvaluator, 0, 2 * rs->T + 2);
 
     GfPolyInv(syn, rs->T);
-    GfPolyMul(syn, rs->T, locator, locatorSize, errataEvaluator);
+    GfPolyMul(syn, rs->T, rs->fixerBuffer.locator, locatorSize, rs->fixerBuffer.errataEvaluator);
     for(uint8_t i = 0; i < locatorSize; i++)
     {
-        errataEvaluator[i] = errataEvaluator[rs->T + i];
+        rs->fixerBuffer.errataEvaluator[i] = rs->fixerBuffer.errataEvaluator[rs->T + i];
     }
 
-    uint8_t errataPosition[RS_MAX_REDUNDANCY_BYTES];
     for(uint8_t i = 0; i < errCount; i++)
     {
-        errataPosition[i] = GfPow(2, size - 1 - evaluator[i]);
+        rs->fixerBuffer.errataPosition[i] = GfPow(2, size - 1 - evaluator[i]);
     }
 
     uint8_t *errLocPrimePoly = syn; //reuse
@@ -333,12 +295,12 @@ static bool fix(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *syn, u
     for(uint8_t i = 0; i < errCount; i++)
     {
         errLocPrimePolyLen = 0;
-        uint8_t errataInv = GfInv(errataPosition[i]);
+        uint8_t errataInv = GfInv(rs->fixerBuffer.errataPosition[i]);
         for(uint8_t j = 0; j < errCount; j++)
         {
             if(j != i)
             {
-                errLocPrimePoly[errLocPrimePolyLen++] = GfSub(1, GfMul(errataInv, errataPosition[j]));
+                errLocPrimePoly[errLocPrimePolyLen++] = GfSub(1, GfMul(errataInv, rs->fixerBuffer.errataPosition[j]));
             }
         }
         uint8_t errLocPrime = 1;
@@ -347,12 +309,12 @@ static bool fix(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *syn, u
             errLocPrime = GfMul(errLocPrime, errLocPrimePoly[j]);
         }
 
-        uint8_t y = GfPolyEval(errataEvaluator, locatorSize, errataInv);
+        uint8_t y = GfPolyEval(rs->fixerBuffer.errataEvaluator, locatorSize, errataInv);
         //in general y*=errataInv**(fcr-1)
         //for fcr=0 y*=errataInv**-1=errataPosition
         //for fcr=1 y does not change
         if(rs->fcr == 0)
-            y = GfMul(y, errataPosition[i]);
+            y = GfMul(y, rs->fixerBuffer.errataPosition[i]);
         else if(rs->fcr > 0)
             y = GfMul(y, GfPow(errataInv, rs->fcr - 1));
 
@@ -392,39 +354,36 @@ bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed)
     if((size > (RS_BLOCK_SIZE - rs->T)) || (rs->T > RS_MAX_REDUNDANCY_BYTES))
         return false;
     
-    //This function needs 3 arrays of RS_MAX_REDUNDANCY_BYTES + 1 each
-    static uint8_t syn[RS_MAX_REDUNDANCY_BYTES + 1];
-    static uint8_t locator[RS_MAX_REDUNDANCY_BYTES + 1];
-    static uint8_t evaluator[RS_MAX_REDUNDANCY_BYTES + 1];
-    
-    memset(syn, 0, rs->T + 1);
-    memset(locator, 0, rs->T + 1);
-    memset(evaluator, 0, rs->T + 1);
+    memset(rs->decodeBuffer.syndromes, 0, rs->T + 1);
+    memset(rs->decodeBuffer.locator, 0, rs->T + 1);
+    memset(rs->decodeBuffer.evaluator, 0, rs->T + 1);
 
     memmove(&data[RS_BLOCK_SIZE - rs->T], &data[size], rs->T);
     memset(&data[size], 0, RS_BLOCK_SIZE - size - rs->T);
     
-    syndromes(rs, data, RS_BLOCK_SIZE, syn); //calculate syndromes
+    syndromes(rs, data, RS_BLOCK_SIZE, rs->decodeBuffer.syndromes); //calculate syndromes
 
-    if(checkSyndromes(syn, rs->T))
+    if(checkSyndromes(rs->decodeBuffer.syndromes, rs->T))
         return true;
 
     uint8_t locatorSize = 0;
 
-    if(!errorLocator(rs, syn, locator, &locatorSize)) //calculate error locator polynomial
+    if(!errorLocator(rs, rs->decodeBuffer.syndromes, rs->decodeBuffer.locator, &locatorSize)) //calculate error locator polynomial
         return false;
 
-    if(!errorEvaluator(locator, locatorSize, evaluator)) //calculate error evaulator (list of erroneous positions)
+    if(!errorEvaluator(rs->decodeBuffer.locator, locatorSize, rs->decodeBuffer.evaluator)) //calculate error evaulator (list of erroneous positions)
         return false;
 
-    if(!fix(rs, data, RS_BLOCK_SIZE, syn, evaluator, locatorSize - 1)) //calculate error magnitude (errata) polynomial and try to fix
+    if(!fix(rs, data, RS_BLOCK_SIZE, 
+            rs->decodeBuffer.syndromes, rs->decodeBuffer.evaluator, locatorSize - 1)) //calculate error magnitude (errata) polynomial and try to fix
         return false;
 
-    syndromes(rs, data, RS_BLOCK_SIZE, syn); //calculate syndromes again to check if the message has been corrected successfully
+    syndromes(rs, data, RS_BLOCK_SIZE, rs->decodeBuffer.syndromes); //calculate syndromes again to check if the message has been corrected successfully
 
-    if(checkSyndromes(syn, rs->T))
+    if(checkSyndromes(rs->decodeBuffer.syndromes, rs->T))
     {
-        *fixed = locatorSize - 1;
+        if(NULL != fixed)
+            *fixed = locatorSize - 1;
         return true;
     }
     else
@@ -437,9 +396,8 @@ void RsEncode(struct LwFecRS *rs, uint8_t *data, uint8_t size)
         return;
 
     memset(&data[size], 0, RS_BLOCK_SIZE - size);
-    static uint8_t t[RS_BLOCK_SIZE];
-    memset(t, 0, sizeof(t));
-    memcpy(&data[size], GfPolyDiv(data, RS_BLOCK_SIZE, rs->generator, rs->T + 1, t), rs->T);
+    memset(rs->encodeBuffer, 0, sizeof(rs->encodeBuffer));
+    memcpy(&data[size], GfPolyDiv(data, RS_BLOCK_SIZE, rs->generator, rs->T + 1, rs->encodeBuffer), rs->T);
 }
 
 void RsInit(struct LwFecRS *rs, uint8_t T, uint8_t fcr)
@@ -447,13 +405,12 @@ void RsInit(struct LwFecRS *rs, uint8_t T, uint8_t fcr)
     if(T > RS_MAX_REDUNDANCY_BYTES)
         return;
     
-    static uint8_t temp[RS_MAX_REDUNDANCY_BYTES + 1];
     memset(rs->generator, 0, T + 1);
     rs->generator[0] = 1;
     for(uint8_t i = 0; i < T; i++)
     {
-        memcpy(temp, rs->generator, i + 1);
-        GfPolyMul(temp, i + 1, (uint8_t[2]){1, GfPow2(i + fcr)}, 2, rs->generator);
+        memcpy(rs->initBuffer, rs->generator, i + 1);
+        GfPolyMul(rs->initBuffer, i + 1, (uint8_t[2]){1, GfPow2(i + fcr)}, 2, rs->generator);
     }
     rs->T = T;
     rs->fcr = fcr;
