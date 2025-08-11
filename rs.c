@@ -20,8 +20,8 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include "gf.h"
 #include <string.h>
 
-#define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
-//#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
+//#define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
+#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
 
 /**
  * @brief Calculates message syndromes
