@@ -87,7 +87,7 @@ struct LwFecRS
  * @param *rs RS coder/decoder instance
  * @param *data Input/output buffer. Must be of size N = 255
  * @param size Data size = K
- * @param *fixed Output number of bytes corrected
+ * @param *fixed Output number of bytes corrected (NULL if not needed)
  * @return True on success, false on failure
  */
 bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);
