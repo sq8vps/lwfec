@@ -5,11 +5,8 @@ LwFEC is a full Reed-Solomon FEC encoder and decoder C library dedicated for emb
 * No heap (malloc) is used
 * No stack-allocated arrays are used
 
-All buffers are stored in the main FEC structure.
-
 Parity byte count limit can be changed freely according to application requirements. This allows the memory usage to stay at the required minimum.\
-**Warning! LwFEC library is not thread/interrupt safe.** \
-However, encoding and decoding can be done simultaneously.
+**Warning! LwFEC library is not thread/interrupt safe.** 
 
 ## Example usage
 The example below shows how to initialize library, encode and decode a message:
