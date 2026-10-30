@@ -1,22 +1,21 @@
 # LwFEC - Lightweight Forward Error Correction library
 LwFEC is a full Reed-Solomon FEC encoder and decoder C library dedicated for embedded and other RAM usage restricted systems.
 ## Memory usage
- The aim of this library is to be safe and deterministic, thus:
-* No heap (malloc) is used
-* No stack-allocated arrays are used
+The library can be compiled in two variants:
+* Use global buffers (default), so that:
+    * no heap (malloc) is used,
+    * no stack-allocated arrays are used,
+    * at most one instance can be used at any given time.
+* Use per-instance buffers, enabled by adding a **global** `RS_USE_BUFFERS_PER_INSTANCE` definition, so that:
+    * each instance can be used independently,
+    * the instance structure is bigger (whether it is allocated on the stack, heap, or globally is up to user).
 
-All buffers are stored by default in the main FEC structure. To store buffers as global arrays add
-```C
-#define RS_USE_GLOBAL_BUFFERS
-```
-before including ``rs.h``. **When global buffers are used only one FEC instance can be used at the same time.**
 
 Parity byte count limit can be changed freely according to application requirements. This allows the memory usage to stay at the required minimum.\
-**Warning! LwFEC library is not thread/interrupt safe.** \
-However, encoding and decoding can be done simultaneously.
+**Warning! LwFEC library is not thread/interrupt safe.** 
 
 ## Example usage
-The example below shows how to initialize library, encode and decode a message:
+The example below shows how to initialize library, encode, and decode a message:
 ```C
 #include <stdint.h> //standard integer types header
 #include "rs.h" //RS FEC library
@@ -31,9 +30,9 @@ void LwFEC(void)
 {
     RsInit(&rs, T, FCR);
     uint8_t data[RS_BLOCK_SIZE] = {'H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', '\0'};
-    RsEncode(&rs, data, N); //encode message
+    RsEncode(&rs, data, K); //encode message
 
-    //then N=RS_BLOCK_SIZE bytes of data are sent through some channel
+    //then K=RS_BLOCK_SIZE bytes of data are sent through some channel
     //or stored on some disk
     //this may introduce errors that the decoder will try to fix
     
@@ -55,10 +54,11 @@ void LwFEC(void)
 ## Important notes
 The block size is always equal to RS_BLOCK_SIZE (255 bytes) due to use of GF(2^8), however the library can handle any data size *K* provided *T + K <= RS_BLOCK_SIZE*. The remaining block space is padded automatically with zeros. The application just needs to provide *K* bytes of data.
 ## Size limit change
-Size limits used for array preallocation are stored in *rs.h*:
+Size limits used for array (pre)allocation are stored in *rs.h*:
 ```C
 #define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
 ```
+This can be overriden by setting a global definition.
 ## License
 The code is based on [*Reed-Solomon codes for coders*](https://en.wikiversity.org/wiki/Reed%E2%80%93Solomon_codes_for_coders).
 The project is licensed under the GNU GPL v3 license (see [LICENSE](LICENSE)).

@@ -1,5 +1,5 @@
 /*
-Copyright 2023-2025 Piotr Wilkoń
+Copyright 2023-2026 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -19,6 +19,7 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include "rs.h"
 #include "gf.h"
 #include <string.h>
+#include <stdio.h>
 
 #define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
 //#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
@@ -34,7 +35,7 @@ static struct LwFecRSBuffers RsBuffers;
  * @param size Block size = N
  * @param out Output syndromes (length = T)
  */
-static void syndromes(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *out)
+static void syndromes(const struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *out)
 {
     for(uint8_t i = 0; i < rs->T; i++)
     {
@@ -59,7 +60,7 @@ static bool errorEvaluator(uint8_t *locator, uint8_t locatorSize, uint8_t *out)
     uint8_t pos = 0;
     for(uint8_t i = 0; i < RS_BLOCK_SIZE; i++)
     {   
-        #ifdef RS_USE_HORNER
+#ifdef RS_USE_HORNER
         //standard evalution with Horner's method
         //evaluate at 2^i. GfPow() can be used, but taking values from exp table directly is faster
         if(GfPolyEval(locator, locatorSize, GfPow2(i % 255)) == 0) //if 2^i is the root of the locator polynomial, it determines the error position
@@ -70,7 +71,7 @@ static bool errorEvaluator(uint8_t *locator, uint8_t locatorSize, uint8_t *out)
                 break;
             pos++;
         }
-        #else
+#else
         //evalution with Chien search
         uint8_t lambda = 0;
         for(uint8_t j = 0; j < locatorSize; j++)
@@ -79,7 +80,7 @@ static bool errorEvaluator(uint8_t *locator, uint8_t locatorSize, uint8_t *out)
         }
         if(lambda == 0) 
             out[pos++] = RS_BLOCK_SIZE - i - 1; 
-        #endif
+#endif
     }
 
 
@@ -211,15 +212,10 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         uint8_t delta = syndromes[i];
         for(uint8_t j = 1; j < errLocLen; j++)
         {
-            delta = GfSub(delta, GfMul(buffers->locatorBuffer.errLoc[j], syndromes[i - j]));
+            delta = GfSub(delta, GfMul(buffers->locatorBuffer.errLoc[errLocLen - j - 1], syndromes[i - j]));
         }
 
-        for(uint8_t j = 0; j < oldLocLen; j++)
-        {
-            buffers->locatorBuffer.oldLoc[oldLocLen - j] = buffers->locatorBuffer.oldLoc[oldLocLen - j - 1];
-        }
-        buffers->locatorBuffer.oldLoc[0] = 0;
-
+        buffers->locatorBuffer.oldLoc[oldLocLen] = 0;
         oldLocLen++;
 
         if(delta != 0)
@@ -233,6 +229,7 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
                 memcpy(buffers->locatorBuffer.errLoc, buffers->locatorBuffer.newLoc, newLocLen);
                 errLocLen = newLocLen;
             }
+            //newLoc won't be used anymore, use it as a buffer
             GfPolyScale(buffers->locatorBuffer.oldLoc, oldLocLen, delta, buffers->locatorBuffer.newLoc);
             newLocLen = oldLocLen;
             memcpy(buffers->locatorBuffer.tmpLoc, buffers->locatorBuffer.errLoc, errLocLen);
@@ -249,10 +246,12 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         out[index++] = buffers->locatorBuffer.errLoc[i];
     }
 
-    if(((errLocLen - 1) << 1) > rs->T)
+    if(((index - 1) << 1) > rs->T)
         return false;
 
-    *outSize = errLocLen;
+    GfPolyInv(out, index);
+
+    *outSize = index;
     return true;
 #endif
 }
@@ -440,6 +439,7 @@ void RsInit(struct LwFecRS *rs, uint8_t T, uint8_t fcr)
     if(T > RS_MAX_REDUNDANCY_BYTES)
         return;
     
+    static uint8_t temp[RS_MAX_REDUNDANCY_BYTES + 1];
     memset(rs->generator, 0, T + 1);
     rs->generator[0] = 1;
     for(uint8_t i = 0; i < T; i++)

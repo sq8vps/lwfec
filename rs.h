@@ -1,5 +1,5 @@
 /*
-Copyright 2023-2025 Piotr Wilkoń
+Copyright 2023-2026 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -19,15 +19,13 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef RS_MAX_REDUNDANCY_BYTES
 #define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
-
+#endif
 
 #define RS_BLOCK_SIZE 255 //natural full RS block size
 #define RS_MAX_DATA_SIZE (RS_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
 
-/**
- * @brief Buffer used internally by the RS module
- */
 struct LwFecRSBuffers
 {
     union
@@ -83,7 +81,6 @@ struct LwFecRS
 
 #ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers buffers;
-    #define 
 #endif
 };
 
@@ -96,7 +93,7 @@ struct LwFecRS
  * @param *rs RS coder/decoder instance
  * @param *data Input/output buffer. Must be of size N = 255
  * @param size Data size = K
- * @param *fixed Output number of bytes corrected (NULL if not needed)
+ * @param *fixed Output number of bytes corrected. Can be set to \a NULL if not needed.
  * @return True on success, false on failure
  */
 bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);

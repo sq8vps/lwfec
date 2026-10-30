@@ -3,8 +3,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#define RS_USE_BUFFERS_PER_INSTANCE
-
 #include "rs.h"
 
 struct LwFecRS rs;
@@ -23,12 +21,12 @@ int main(int, char**)
     data[27] = 'x';
     data[28] = 'u';
 
-    printf("Broken data: %s\n", data);
+    printf("Broken data: %.*s\n", (int)size, data);
 
     uint8_t fixed = 0;
     if(RsDecode(&rs, data, size, &fixed))
     {
-        printf("Fixed %d bytes: %s\n", (int)fixed, data);
+        printf("Fixed %d bytes: %.*s\n", (int)fixed, (int)size, data);
     }
     else
     {
