@@ -9,7 +9,7 @@ Parity byte count limit can be changed freely according to application requireme
 **Warning! LwFEC library is not thread/interrupt safe.** 
 
 ## Example usage
-The example below shows how to initialize library, encode and decode a message:
+The example below shows how to initialize library, encode, and decode a message:
 ```C
 #include <stdint.h> //standard integer types header
 #include "rs.h" //RS FEC library
@@ -24,7 +24,7 @@ void LwFEC(void)
 {
     RsInit(&rs, T, FCR);
     uint8_t data[RS_BLOCK_SIZE] = {'H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', '\0'};
-    RsEncode(&rs, data, N); //encode message
+    RsEncode(&rs, data, K); //encode message
 
     //then N=RS_BLOCK_SIZE bytes of data are sent through some channel
     //or stored on some disk

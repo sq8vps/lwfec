@@ -44,10 +44,10 @@ struct LwFecRS
  * @param *rs RS coder/decoder instance
  * @param *data Input/output buffer. Must be of size N = 255
  * @param size Data size = K
- * @param *fixed Output number of bytes corrected
+ * @param *fixed Output number of bytes corrected. Can be set to \a NULL if not needed.
  * @return True on success, false on failure
  */
-bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);
+bool RsDecode(const struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);
 
 /**
  * @brief Encode message using Reed-Solomon FEC
@@ -55,7 +55,7 @@ bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);
  * @param *data Input/output buffer. Must be of size N = 255
  * @param size Data size = K
  */
-void RsEncode(struct LwFecRS *rs, uint8_t *data, uint8_t size);
+void RsEncode(const struct LwFecRS *rs, uint8_t *data, uint8_t size);
 
 /**
  * @brief Initialize Reed-Solomon coder/decoder

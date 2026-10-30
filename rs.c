@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Piotr Wilkoń
+Copyright 2023-2026 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -19,6 +19,7 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include "rs.h"
 #include "gf.h"
 #include <string.h>
+#include <stdio.h>
 
 #define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
 //#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
@@ -42,7 +43,7 @@ static uint8_t commonBuffer[4 * RS_MAX_REDUNDANCY_BYTES + 4];
  * @param size Block size = N
  * @param out Output syndromes (length = T)
  */
-static void syndromes(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *out)
+static void syndromes(const struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *out)
 {
     for(uint8_t i = 0; i < rs->T; i++)
     {
@@ -106,7 +107,7 @@ static bool errorEvaluator(uint8_t *locator, uint8_t locatorSize, uint8_t *out)
  * @param outSize Error locator polynomial buffer length <= T
  * @return True if success, else the "out" buffer must be invalidated and the block is uncorrectable
  */
-static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, uint8_t *outSize)
+static bool errorLocator(const struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, uint8_t *outSize)
 {
     /*
      * The error locator polynomial is calculated using Berlekamp-Massey algorithm.
@@ -232,15 +233,14 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         uint8_t delta = syndromes[i];
         for(uint8_t j = 1; j < errLocLen; j++)
         {
-            delta = GfSub(delta, GfMul(errLoc[j], syndromes[i - j]));
+            delta = GfSub(delta, GfMul(errLoc[errLocLen - j - 1], syndromes[i - j]));
         }
 
-        for(uint8_t j = 0; j < oldLocLen; j++)
-        {
-            oldLoc[oldLocLen - j] = oldLoc[oldLocLen - j - 1];
-        }
-        oldLoc[0] = 0;
-
+        // for(uint8_t j = 0; j < oldLocLen; j++)
+        // {
+        //     oldLoc[oldLocLen - j] = oldLoc[oldLocLen - j - 1];
+        // }
+        oldLoc[oldLocLen] = 0;
         oldLocLen++;
 
         if(delta != 0)
@@ -254,6 +254,7 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
                 memcpy(errLoc, newLoc, newLocLen);
                 errLocLen = newLocLen;
             }
+            //newLoc won't be used anymore, use it as a buffer
             GfPolyScale(oldLoc, oldLocLen, delta, newLoc);
             newLocLen = oldLocLen;
             memcpy(tmpLoc, errLoc, errLocLen);
@@ -270,10 +271,12 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
         out[index++] = errLoc[i];
     }
 
-    if(((errLocLen - 1) << 1) > rs->T)
+    if(((index - 1) << 1) > rs->T)
         return false;
 
-    *outSize = errLocLen;
+    GfPolyInv(out, index);
+
+    *outSize = index;
     return true;
 #endif
 }
@@ -288,7 +291,7 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
  * @param errCount Number of errors (error evaulator size)
  * @return True on success, false on failure
  */
-static bool fix(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *syn, uint8_t *evaluator, uint8_t errCount)
+static bool fix(const struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *syn, uint8_t *evaluator, uint8_t errCount)
 {
     /*
      * This is based on Forney's algorithm.
@@ -387,7 +390,7 @@ static bool checkSyndromes(uint8_t *syndromes, uint8_t size)
     return !err;
 }
 
-bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed)
+bool RsDecode(const struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed)
 {
     if((size > (RS_BLOCK_SIZE - rs->T)) || (rs->T > RS_MAX_REDUNDANCY_BYTES))
         return false;
@@ -424,14 +427,15 @@ bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed)
 
     if(checkSyndromes(syn, rs->T))
     {
-        *fixed = locatorSize - 1;
+        if(NULL != fixed)
+            *fixed = locatorSize - 1;
         return true;
     }
     else
         return false;
 }
 
-void RsEncode(struct LwFecRS *rs, uint8_t *data, uint8_t size)
+void RsEncode(const struct LwFecRS *rs, uint8_t *data, uint8_t size)
 {
     if((size > (RS_BLOCK_SIZE - rs->T)) || (rs->T > RS_MAX_REDUNDANCY_BYTES))
         return;
