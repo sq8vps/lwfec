@@ -1,3 +1,6 @@
+
+#ifdef LWFEC_TEST
+
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>
@@ -35,3 +38,5 @@ int main(int, char**)
 
     return 0;
 }
+
+#endif

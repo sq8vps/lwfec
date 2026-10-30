@@ -439,7 +439,6 @@ void RsInit(struct LwFecRS *rs, uint8_t T, uint8_t fcr)
     if(T > RS_MAX_REDUNDANCY_BYTES)
         return;
     
-    static uint8_t temp[RS_MAX_REDUNDANCY_BYTES + 1];
     memset(rs->generator, 0, T + 1);
     rs->generator[0] = 1;
     for(uint8_t i = 0; i < T; i++)
