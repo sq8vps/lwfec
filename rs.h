@@ -26,15 +26,10 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #define RS_MAX_DATA_SIZE (RS_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
 
 /**
- * @brief Reed-Solomon module configuration and operation structure
-*/
-struct LwFecRS
+ * @brief Buffer used internally by the RS module
+ */
+struct LwFecRSBuffers
 {
-    uint8_t generator[RS_MAX_REDUNDANCY_BYTES + 1]; //generator polynomial
-    uint8_t T; //number of redundancy/parity bytes
-    uint8_t fcr; //first consecutive root index
-
-
     union
     {
         uint8_t initBuffer[RS_MAX_REDUNDANCY_BYTES + 1];
@@ -75,7 +70,20 @@ struct LwFecRS
         } fixerBuffer;
         
     };
-    
+};
+
+/**
+ * @brief Reed-Solomon module configuration and operation structure
+*/
+struct LwFecRS
+{
+    uint8_t generator[RS_MAX_REDUNDANCY_BYTES + 1]; //generator polynomial
+    uint8_t T; //number of redundancy/parity bytes
+    uint8_t fcr; //first consecutive root index    
+
+#ifndef RS_USE_GLOBAL_BUFFERS
+    struct LwFecRSBuffers buffers;
+#endif
 };
 
 /**
