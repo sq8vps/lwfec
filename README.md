@@ -32,7 +32,7 @@ void LwFEC(void)
     uint8_t data[RS_BLOCK_SIZE] = {'H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', '\0'};
     RsEncode(&rs, data, K); //encode message
 
-    //then K=RS_BLOCK_SIZE bytes of data are sent through some channel
+    //then N=RS_BLOCK_SIZE bytes of data are sent through some channel
     //or stored on some disk
     //this may introduce errors that the decoder will try to fix
     
