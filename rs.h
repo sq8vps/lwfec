@@ -81,8 +81,9 @@ struct LwFecRS
     uint8_t T; //number of redundancy/parity bytes
     uint8_t fcr; //first consecutive root index    
 
-#ifndef RS_USE_GLOBAL_BUFFERS
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers buffers;
+    #define 
 #endif
 };
 

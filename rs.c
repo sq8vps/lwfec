@@ -23,7 +23,7 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #define RS_USE_ALTERNATIVE_BM //use alternative Berlekamp-Massey implementation. Seems to be a bit faster
 //#define RS_USE_HORNER //use standard polynomial evalution method (Horner scheme) instead of Chien search. A bit slower
 
-#ifdef RS_USE_GLOBAL_BUFFERS
+#ifndef RS_USE_BUFFERS_PER_INSTANCE
 static struct LwFecRSBuffers RsBuffers;
 #endif
 
@@ -100,7 +100,7 @@ static bool errorEvaluator(uint8_t *locator, uint8_t locatorSize, uint8_t *out)
  */
 static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, uint8_t *outSize)
 {
-#ifndef RS_USE_GLOBAL_BUFFERS
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers *buffers = &rs->buffers;
 #else
     struct LwFecRSBuffers *buffers = &RsBuffers;
@@ -269,7 +269,7 @@ static bool errorLocator(struct LwFecRS *rs, uint8_t *syndromes, uint8_t *out, u
  */
 static bool fix(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *syn, uint8_t *evaluator, uint8_t errCount)
 {
-#ifndef RS_USE_GLOBAL_BUFFERS
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers *buffers = &rs->buffers;
 #else
     struct LwFecRSBuffers *buffers = &RsBuffers;
@@ -368,7 +368,7 @@ static bool checkSyndromes(uint8_t *syndromes, uint8_t size)
 
 bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed)
 {
-#ifndef RS_USE_GLOBAL_BUFFERS
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers *buffers = &rs->buffers;
 #else
     struct LwFecRSBuffers *buffers = &RsBuffers;
@@ -415,7 +415,7 @@ bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed)
 
 void RsEncode(struct LwFecRS *rs, uint8_t *data, uint8_t size)
 {
-#ifndef RS_USE_GLOBAL_BUFFERS
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers *buffers = &rs->buffers;
 #else
     struct LwFecRSBuffers *buffers = &RsBuffers;
@@ -431,7 +431,7 @@ void RsEncode(struct LwFecRS *rs, uint8_t *data, uint8_t size)
 
 void RsInit(struct LwFecRS *rs, uint8_t T, uint8_t fcr)
 {
-#ifndef RS_USE_GLOBAL_BUFFERS
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
     struct LwFecRSBuffers *buffers = &rs->buffers;
 #else
     struct LwFecRSBuffers *buffers = &RsBuffers;
