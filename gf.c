@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Piotr Wilkoń
+Copyright 2023-2026 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -60,7 +60,7 @@ const uint8_t GfLog[256] =
 };
 
 
-void GfPolyScale(uint8_t *p, uint8_t o, uint8_t s, uint8_t *out)
+void GfPolyScale(const uint8_t *p, uint8_t o, uint8_t s, uint8_t *out)
 {
     for(uint8_t i = 0; i < o; i++)
     {
@@ -68,27 +68,28 @@ void GfPolyScale(uint8_t *p, uint8_t o, uint8_t s, uint8_t *out)
     }
 }
 
-uint8_t GfPolyAdd(uint8_t *p1, uint8_t o1, uint8_t *p2, uint8_t o2, uint8_t *out)
+uint8_t GfPolyAdd(const uint8_t *p1, uint8_t o1, const uint8_t *p2, uint8_t o2, uint8_t *out)
 {
-    if(o1 >= o2) //p1 is longer than p2
+    uint8_t size = (o1 > o2) ? o1 : o2;
+    memcpy(out, (o1 > o2) ? p1 : p2, size);
+    if(o1 > o2)
     {
         for(uint8_t i = 0; i < o2; i++)
         {
-            out[i] = p1[i] ^ p2[i];
+            out[size - i - 1] ^= p2[o2 - i - 1];
         }
-        return o1;
     }
-    else //p2 is longer than p1
+    else
     {
         for(uint8_t i = 0; i < o1; i++)
         {
-            out[i] = p1[i] ^ p2[2];
+            out[size - i - 1] ^= p1[o1 - i - 1];
         }
-        return o2;
     }
+    return size;
 }
 
-void GfPolyMul(uint8_t *p1, uint8_t o1, uint8_t *p2, uint8_t o2, uint8_t *out)
+void GfPolyMul(const uint8_t *p1, uint8_t o1, const uint8_t *p2, uint8_t o2, uint8_t *out)
 {
     memset(out, 0, o1 + o2 - 1);
     for(uint8_t i = 0; i < o1; i++)
@@ -100,7 +101,7 @@ void GfPolyMul(uint8_t *p1, uint8_t o1, uint8_t *p2, uint8_t o2, uint8_t *out)
     }
 }
 
-uint8_t GfPolyEval(uint8_t *p, uint8_t o, uint8_t x)
+uint8_t GfPolyEval(const uint8_t *p, uint8_t o, uint8_t x)
 {
     uint8_t ret = p[0];
     for(uint8_t i = 1; i < o; i++)
@@ -110,7 +111,7 @@ uint8_t GfPolyEval(uint8_t *p, uint8_t o, uint8_t x)
     return ret;
 }
 
-uint8_t *GfPolyDiv(uint8_t *p1, uint8_t o1, uint8_t *p2, uint8_t o2, uint8_t *out)
+uint8_t *GfPolyDiv(const uint8_t *p1, uint8_t o1, const uint8_t *p2, uint8_t o2, uint8_t *out)
 {
     memcpy(out, p1, o1);
     for(uint8_t i = 0; i < (o1 - o2 + 1); i++)

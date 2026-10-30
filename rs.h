@@ -1,5 +1,5 @@
 /*
-Copyright 2023 Piotr Wilkoń
+Copyright 2023-2026 Piotr Wilkoń
 This file is part of LwFEC.
 
 LwFEC is free software: you can redistribute it and/or modify
@@ -19,20 +19,69 @@ along with LwFEC.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef RS_MAX_REDUNDANCY_BYTES
 #define RS_MAX_REDUNDANCY_BYTES 64 //maximum parity bytes
-
+#endif
 
 #define RS_BLOCK_SIZE 255 //natural full RS block size
 #define RS_MAX_DATA_SIZE (RS_BLOCK_SIZE - RS_MAX_REDUNDANCY_BYTES)
 
+struct LwFecRSBuffers
+{
+    union
+    {
+        uint8_t initBuffer[RS_MAX_REDUNDANCY_BYTES + 1];
+        uint8_t encodeBuffer[RS_BLOCK_SIZE];
+    };
+
+    struct
+    {
+        uint8_t syndromes[RS_MAX_REDUNDANCY_BYTES + 1];
+        uint8_t locator[RS_MAX_REDUNDANCY_BYTES + 1];
+        uint8_t evaluator[RS_MAX_REDUNDANCY_BYTES + 1];
+    } decodeBuffer;
+
+    union
+    {
+        union
+        {
+            struct
+            {
+                uint8_t errLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t newLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t oldLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t tmpLoc[RS_MAX_REDUNDANCY_BYTES + 1];
+            };
+            struct
+            {
+                uint8_t B[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t C[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t T[RS_MAX_REDUNDANCY_BYTES + 1];
+                uint8_t T2[RS_MAX_REDUNDANCY_BYTES + 1];
+            };
+        } locatorBuffer;
+        struct
+        {
+            uint8_t locator[RS_MAX_REDUNDANCY_BYTES + 1];
+            uint8_t errataEvaluator[2 * RS_MAX_REDUNDANCY_BYTES + 2];
+            uint8_t errataPosition[RS_MAX_REDUNDANCY_BYTES];
+        } fixerBuffer;
+        
+    };
+};
+
 /**
- * @brief Reed-Solomon module configuration structure
+ * @brief Reed-Solomon module configuration and operation structure
 */
 struct LwFecRS
 {
     uint8_t generator[RS_MAX_REDUNDANCY_BYTES + 1]; //generator polynomial
     uint8_t T; //number of redundancy/parity bytes
-    uint8_t fcr; //first consecutive root index
+    uint8_t fcr; //first consecutive root index    
+
+#ifdef RS_USE_BUFFERS_PER_INSTANCE
+    struct LwFecRSBuffers buffers;
+#endif
 };
 
 /**
@@ -44,7 +93,7 @@ struct LwFecRS
  * @param *rs RS coder/decoder instance
  * @param *data Input/output buffer. Must be of size N = 255
  * @param size Data size = K
- * @param *fixed Output number of bytes corrected
+ * @param *fixed Output number of bytes corrected. Can be set to \a NULL if not needed.
  * @return True on success, false on failure
  */
 bool RsDecode(struct LwFecRS *rs, uint8_t *data, uint8_t size, uint8_t *fixed);
